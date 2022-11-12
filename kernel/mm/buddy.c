@@ -89,7 +89,7 @@ static struct page *split_page(struct phys_mem_pool *pool, u64 order,
                 struct page *buddy = get_buddy_chunk(pool, page);
                 buddy->allocated = 0;
                 buddy->order = page->order;
-                list_add(buddy, &(pool->free_lists[buddy->order].free_list));
+                list_add(&(buddy->node), &(pool->free_lists[buddy->order].free_list));
                 pool->free_lists[buddy->order].nr_free++;
         }
         return page;
@@ -110,7 +110,7 @@ struct page *buddy_get_pages(struct phys_mem_pool *pool, u64 order)
         current_free_list = &(pool->free_lists[order]);
         if (current_free_list->nr_free) {
                 current_free_list->nr_free--;
-                ret = list_entry(&(current_free_list->free_list.next),
+                ret = list_entry((current_free_list->free_list.next),
                                  struct page,
                                  node);
                 list_del(ret);
@@ -145,13 +145,13 @@ static struct page *merge_page(struct phys_mem_pool *pool, struct page *page)
                 return page;
 
         buddy_chunk->allocated = 1;
-        list_del(buddy_chunk);
-        list_del(page);
+        list_del(&(buddy_chunk->node));
+        list_del(&(page->node));
         pool->free_lists[page->order].nr_free -= 2;
 
         // Merge once
         page->order++;
-        list_add(page, &(page->pool->free_lists[page->order].free_list));
+        list_add(&(page->node), &(page->pool->free_lists[page->order].free_list));
         pool->free_lists[page->order].nr_free++;
         return merge_page(pool, page);
         /* LAB 2 TODO 2 END */
@@ -167,7 +167,7 @@ void buddy_free_pages(struct phys_mem_pool *pool, struct page *page)
 
         // 1. free current page
         page->allocated = 0;
-        list_add(page, &(pool->free_lists[page->order].free_list));
+        list_add(&(page->node), &(pool->free_lists[page->order].free_list));
         pool->free_lists[page->order].nr_free++;
 
         // 2. merge page

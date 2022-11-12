@@ -301,26 +301,26 @@ int map_range_in_pgtbl_huge(void *pgtbl, vaddr_t va, paddr_t pa, size_t len,
 
                 get_next_ptp(pgtbl, 0, va, &l1_ptp, &pte, 1);
                 get_next_ptp(l1_ptp, 1, va, &l2_ptp, &pte, 1);
-                if (len >= (PAGE_SIZE << 20)) {
+                if (len >= (PAGE_SIZE << 18)) {
                         set_pte_flags(pte, flags, USER_PTE);
                         pte->l1_block.pfn = pa >> (12 + 9 + 9);
                         pte->l1_block.is_table = 0;
 
-                        va += PAGE_SIZE << 20;
-                        pa += PAGE_SIZE << 20;
-                        len -= PAGE_SIZE << 20;
+                        va += PAGE_SIZE << 18;
+                        pa += PAGE_SIZE << 18;
+                        len -= PAGE_SIZE << 18;
                         continue;
                 }
 
                 get_next_ptp(l2_ptp, 2, va, &l3_ptp, &pte, 1);
-                if (len >= (PAGE_SIZE << 10)) {
+                if (len >= (PAGE_SIZE << 9)) {
                         set_pte_flags(pte, flags, USER_PTE);
                         pte->l2_block.pfn = pa >> (12 + 9);
                         pte->l2_block.is_table = 0;
 
-                        va += PAGE_SIZE << 10;
-                        pa += PAGE_SIZE << 10;
-                        len -= PAGE_SIZE << 10;
+                        va += PAGE_SIZE << 9;
+                        pa += PAGE_SIZE << 9;
+                        len -= PAGE_SIZE << 9;
                         continue;
                 }
 
@@ -347,8 +347,8 @@ int unmap_range_in_pgtbl_huge(void *pgtbl, vaddr_t va, size_t len)
                 if (!pte->l1_block.is_table) {
                         pte->l1_block.is_valid = 0;
 
-                        va += PAGE_SIZE << 20;
-                        len -= PAGE_SIZE << 20;
+                        va += PAGE_SIZE << 18;
+                        len -= PAGE_SIZE << 18;
                         continue;
                 }
 
@@ -356,8 +356,8 @@ int unmap_range_in_pgtbl_huge(void *pgtbl, vaddr_t va, size_t len)
                 if (!pte->l2_block.is_table) {
                         pte->l2_block.is_valid = 0;
 
-                        va += PAGE_SIZE << 10;
-                        len -= PAGE_SIZE << 10;
+                        va += PAGE_SIZE << 9;
+                        len -= PAGE_SIZE << 9;
                         continue;
                 }
 
