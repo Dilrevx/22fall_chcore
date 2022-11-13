@@ -217,21 +217,23 @@ int query_in_pgtbl(void *pgtbl, vaddr_t va, paddr_t *pa, pte_t **entry)
                         return -ENOMAPPING;
                 else if (err == BLOCK_PTP || i == 3) {
                         *entry = pte;
+                        // printk("i=%d\n",i);
                         switch (i) {
                         case 1:
-                                *pa = (pte->l1_block.pfn << L1_INDEX_SHIFT)
-                                      | GET_VA_OFFSET_L1(va);
+                                *pa = (u64)((u64)pte->l1_block.pfn << (u64)L1_INDEX_SHIFT)
+                                      | (u64)GET_VA_OFFSET_L1(va);
+                                // printk("pa = %llx", 4LL <<30LL);
                                 break;
                         case 2:
-                                *pa = (pte->l2_block.pfn << L2_INDEX_SHIFT)
-                                      | GET_VA_OFFSET_L2(va);
+                                *pa = (u64)((u64)pte->l2_block.pfn << (u64)L2_INDEX_SHIFT)
+                                      | (u64)GET_VA_OFFSET_L2(va);
                                 break;
                         case 3:
-                                *pa = (pte->l3_page.pfn << L3_INDEX_SHIFT)
-                                      | GET_VA_OFFSET_L3(va);
+                                *pa = (u64)((u64)pte->l3_page.pfn << (u64)L3_INDEX_SHIFT)
+                                      | (u64)GET_VA_OFFSET_L3(va);
                                 break;
                         default:
-                                return 0;
+                                break;
                         }
                         return 0;
                 }
@@ -258,10 +260,13 @@ int map_range_in_pgtbl(void *pgtbl, vaddr_t va, paddr_t pa, size_t len,
                 get_next_ptp(pgtbl, 0, va, &l1_ptp, &pte, 1);
                 get_next_ptp(l1_ptp, 1, va, &l2_ptp, &pte, 1);
                 get_next_ptp(l2_ptp, 2, va, &l3_ptp, &pte, 1);
-                get_next_ptp(l3_ptp, 3, va, &_, &pte, 0);
+                /* This util function assign &pte after alloc */
+                // get_next_ptp(l3_ptp, 3, va, &_, &pte, 0);
 
+                pte = &(l3_ptp->ent[GET_L3_INDEX(va)]);
                 pte->pte = 0;
-                pte->l3_page.is_page = pte->l3_page.is_valid = 1;
+                pte->l3_page.is_page = 1;
+                pte->l3_page.is_valid = 1;
                 set_pte_flags(pte, flags, USER_PTE);
                 pte->l3_page.pfn = pa >> L3_INDEX_SHIFT;
 
@@ -286,15 +291,20 @@ int unmap_range_in_pgtbl(void *pgtbl, vaddr_t va, size_t len)
                 int err;
 
                 err = get_next_ptp(pgtbl, 0, va, &l1_ptp, &pte, 0);
-                if (err <0) continue;
+                if (err < 0)
+                        continue;
                 err = get_next_ptp(l1_ptp, 1, va, &l2_ptp, &pte, 0);
-                if (err <0) continue;
+                if (err < 0)
+                        continue;
                 err = get_next_ptp(l2_ptp, 2, va, &l3_ptp, &pte, 0);
-                if (err <0)  continue;
+                if (err < 0)
+                        continue;
                 err = get_next_ptp(l3_ptp, 3, va, &_, &pte, 0);
+                if (err < 0)
+                        continue;
 
                 pte->l3_page.is_valid = 0;
-                
+
                 va += PAGE_SIZE;
         }
         return 0;
@@ -309,35 +319,54 @@ int map_range_in_pgtbl_huge(void *pgtbl, vaddr_t va, paddr_t pa, size_t len,
         while (len) {
                 ptp_t *l1_ptp, *l2_ptp, *l3_ptp, *_;
                 pte_t *pte;
+                int err;
 
-                get_next_ptp(pgtbl, 0, va, &l1_ptp, &pte, 1);
-                get_next_ptp(l1_ptp, 1, va, &l2_ptp, &pte, 1);
-                if (len >= (PAGE_SIZE << 18)) {
+                err = get_next_ptp(pgtbl, 0, va, &l1_ptp, &pte, 1);
+                if (err<0) return err;
+
+                if (len >= (1 << 30)) {
+                        pte = &(l1_ptp->ent[GET_L1_INDEX(va)]);
+
+                        pte->pte = 0;
+                        pte->l1_block.is_valid = 1;
                         set_pte_flags(pte, flags, USER_PTE);
-                        pte->l1_block.pfn = pa >> (12 + 9 + 9);
+                        pte->l1_block.pfn = pa >> L1_INDEX_SHIFT;
                         pte->l1_block.is_table = 0;
 
-                        va += PAGE_SIZE << 18;
-                        pa += PAGE_SIZE << 18;
-                        len -= PAGE_SIZE << 18;
+                        va += 1 << 30;
+                        pa += 1 << 30;
+                        len -= 1 << 30;
                         continue;
                 }
 
-                get_next_ptp(l2_ptp, 2, va, &l3_ptp, &pte, 1);
-                if (len >= (PAGE_SIZE << 9)) {
+                err = get_next_ptp(l1_ptp, 1, va, &l2_ptp, &pte, 1);
+                if (err <0) return err;
+
+                if (len >= (2 << 20)) {
+                        pte = &(l2_ptp->ent[GET_L2_INDEX(va)]);
+
+                        pte->pte = 0;
+                        pte->l2_block.is_valid = 1;
                         set_pte_flags(pte, flags, USER_PTE);
-                        pte->l2_block.pfn = pa >> (12 + 9);
+                        pte->l2_block.pfn = pa >> L2_INDEX_SHIFT;
                         pte->l2_block.is_table = 0;
 
-                        va += PAGE_SIZE << 9;
-                        pa += PAGE_SIZE << 9;
-                        len -= PAGE_SIZE << 9;
+                        va += 2 << 20;
+                        pa += 2 << 20;
+                        len -= 2 << 20;
                         continue;
                 }
 
-                get_next_ptp(l3_ptp, 3, va, &_, &pte, 1);
+                err = get_next_ptp(l2_ptp, 2, va, &l3_ptp, &pte, 1);
+                if (err <0) return err;
+
+                pte = &(l3_ptp->ent[GET_L3_INDEX(va)]);
+
+                pte->pte = 0;
+                pte->l3_page.is_valid = 1;
                 set_pte_flags(pte, flags, USER_PTE);
-                pte->l3_page.pfn = pa >> 12;
+                pte->l3_page.pfn = pa >> L3_INDEX_SHIFT;
+                pte->l3_page.is_page = 1;
 
                 va += PAGE_SIZE;
                 pa += PAGE_SIZE;
@@ -350,33 +379,24 @@ int map_range_in_pgtbl_huge(void *pgtbl, vaddr_t va, paddr_t pa, size_t len,
 int unmap_range_in_pgtbl_huge(void *pgtbl, vaddr_t va, size_t len)
 {
         /* LAB 2 TODO 4 BEGIN */
+        paddr_t _;
+        pte_t *pte;
+        int err;
         while (len) {
-                ptp_t *l1_ptp, *l2_ptp, *l3_ptp, *_;
-                pte_t *pte;
-
-                get_next_ptp(pgtbl, 0, va, &l1_ptp, &pte, 1);
-                get_next_ptp(l1_ptp, 1, va, &l2_ptp, &pte, 1);
-                if (!pte->l1_block.is_table) {
-                        pte->l1_block.is_valid = 0;
-
-                        va += PAGE_SIZE << 18;
-                        len -= PAGE_SIZE << 18;
-                        continue;
+                err = query_in_pgtbl(pgtbl, va, &_, &pte);
+                if (err >= 0)
+                        pte->table.is_valid = 0;
+                else return err;
+                if (len >= (1 << 30)) {
+                        len -= 1 << 30;
+                        va += 1 << 30;
+                } else if (len >= (2 << 20)) {
+                        len -= 2 << 20;
+                        va += 2 << 20;
+                } else {
+                        len -= PAGE_SIZE;
+                        va += PAGE_SIZE;
                 }
-
-                get_next_ptp(l2_ptp, 2, va, &l3_ptp, &pte, 1);
-                if (!pte->l2_block.is_table) {
-                        pte->l2_block.is_valid = 0;
-
-                        va += PAGE_SIZE << 9;
-                        len -= PAGE_SIZE << 9;
-                        continue;
-                }
-
-                get_next_ptp(l3_ptp, 3, va, &_, &pte, 1);
-                pte->l3_page.is_valid = 0;
-                va += PAGE_SIZE;
-                len -= PAGE_SIZE;
         }
         return 0;
         /* LAB 2 TODO 4 END */
@@ -508,14 +528,19 @@ void lab2_test_page_table(void)
                 ret = map_range_in_pgtbl_huge(
                         pgtbl, 0x100000000, 0x100000000, len, flags);
                 lab_assert(ret == 0);
+                BUG_ON(ret);
                 used_mem =
                         free_mem - get_free_mem_size_from_buddy(&global_mem[0]);
                 lab_assert(used_mem < PAGE_SIZE * 8);
+                // BUG_ON(used_mem > PAGE_SIZE *8);
 
                 for (vaddr_t va = 0x100000000; va < 0x100000000 + len;
                      va += 5 * PAGE_SIZE + 0x100) {
                         ret = query_in_pgtbl(pgtbl, va, &pa, &pte);
                         lab_assert(ret == 0 && pa == va);
+                        // printk("ret%d", ret);
+                        // printk("pa = %lx, va = %lx", pa, va);
+                        // BUG_ON(ret || pa != va);
                 }
 
                 ret = unmap_range_in_pgtbl_huge(pgtbl, 0x100000000, len);
