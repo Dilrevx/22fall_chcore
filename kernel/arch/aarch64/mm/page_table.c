@@ -217,19 +217,20 @@ int query_in_pgtbl(void *pgtbl, vaddr_t va, paddr_t *pa, pte_t **entry)
                         return -ENOMAPPING;
                 else if (err == BLOCK_PTP || i == 3) {
                         *entry = pte;
-                        // printk("i=%d\n",i);
                         switch (i) {
                         case 1:
-                                *pa = (u64)((u64)pte->l1_block.pfn << (u64)L1_INDEX_SHIFT)
+                                *pa = (u64)((u64)pte->l1_block.pfn
+                                            << (u64)L1_INDEX_SHIFT)
                                       | (u64)GET_VA_OFFSET_L1(va);
-                                // printk("pa = %llx", 4LL <<30LL);
                                 break;
                         case 2:
-                                *pa = (u64)((u64)pte->l2_block.pfn << (u64)L2_INDEX_SHIFT)
+                                *pa = (u64)((u64)pte->l2_block.pfn
+                                            << (u64)L2_INDEX_SHIFT)
                                       | (u64)GET_VA_OFFSET_L2(va);
                                 break;
                         case 3:
-                                *pa = (u64)((u64)pte->l3_page.pfn << (u64)L3_INDEX_SHIFT)
+                                *pa = (u64)((u64)pte->l3_page.pfn
+                                            << (u64)L3_INDEX_SHIFT)
                                       | (u64)GET_VA_OFFSET_L3(va);
                                 break;
                         default:
@@ -322,7 +323,8 @@ int map_range_in_pgtbl_huge(void *pgtbl, vaddr_t va, paddr_t pa, size_t len,
                 int err;
 
                 err = get_next_ptp(pgtbl, 0, va, &l1_ptp, &pte, 1);
-                if (err<0) return err;
+                if (err < 0)
+                        return err;
 
                 if (len >= (1 << 30)) {
                         pte = &(l1_ptp->ent[GET_L1_INDEX(va)]);
@@ -340,7 +342,8 @@ int map_range_in_pgtbl_huge(void *pgtbl, vaddr_t va, paddr_t pa, size_t len,
                 }
 
                 err = get_next_ptp(l1_ptp, 1, va, &l2_ptp, &pte, 1);
-                if (err <0) return err;
+                if (err < 0)
+                        return err;
 
                 if (len >= (2 << 20)) {
                         pte = &(l2_ptp->ent[GET_L2_INDEX(va)]);
@@ -358,7 +361,8 @@ int map_range_in_pgtbl_huge(void *pgtbl, vaddr_t va, paddr_t pa, size_t len,
                 }
 
                 err = get_next_ptp(l2_ptp, 2, va, &l3_ptp, &pte, 1);
-                if (err <0) return err;
+                if (err < 0)
+                        return err;
 
                 pte = &(l3_ptp->ent[GET_L3_INDEX(va)]);
 
@@ -386,7 +390,8 @@ int unmap_range_in_pgtbl_huge(void *pgtbl, vaddr_t va, size_t len)
                 err = query_in_pgtbl(pgtbl, va, &_, &pte);
                 if (err >= 0)
                         pte->table.is_valid = 0;
-                else return err;
+                else
+                        return err;
                 if (len >= (1 << 30)) {
                         len -= 1 << 30;
                         va += 1 << 30;
@@ -528,19 +533,14 @@ void lab2_test_page_table(void)
                 ret = map_range_in_pgtbl_huge(
                         pgtbl, 0x100000000, 0x100000000, len, flags);
                 lab_assert(ret == 0);
-                BUG_ON(ret);
                 used_mem =
                         free_mem - get_free_mem_size_from_buddy(&global_mem[0]);
                 lab_assert(used_mem < PAGE_SIZE * 8);
-                // BUG_ON(used_mem > PAGE_SIZE *8);
 
                 for (vaddr_t va = 0x100000000; va < 0x100000000 + len;
                      va += 5 * PAGE_SIZE + 0x100) {
                         ret = query_in_pgtbl(pgtbl, va, &pa, &pte);
                         lab_assert(ret == 0 && pa == va);
-                        // printk("ret%d", ret);
-                        // printk("pa = %lx, va = %lx", pa, va);
-                        // BUG_ON(ret || pa != va);
                 }
 
                 ret = unmap_range_in_pgtbl_huge(pgtbl, 0x100000000, len);
