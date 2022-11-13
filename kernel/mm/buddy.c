@@ -117,8 +117,10 @@ struct page *buddy_get_pages(struct phys_mem_pool *pool, u64 order)
         if (order >= BUDDY_MAX_ORDER)
                 return NULL;
 
+        // printk("alloc order %d\n",order);
         current_free_list = &(pool->free_lists[order]);
         if (current_free_list->nr_free) {
+                // printk("%d\n", current_free_list->nr_free);
                 current_free_list->nr_free--;
                 ret = list_entry(
                         (current_free_list->free_list.next), struct page, node);
@@ -127,12 +129,14 @@ struct page *buddy_get_pages(struct phys_mem_pool *pool, u64 order)
                 return ret;
         }
 
+        // printk("failed 1st\n");
         // Failed 1st try, then enumerate on orders
         for (int enum_order = order + 1; enum_order < BUDDY_MAX_ORDER;
              enum_order++) {
                 current_free_list++;
 
                 if (current_free_list->nr_free) {
+                        // printk("%d, %d", enum_order, current_free_list->nr_free);
                         struct page *to_split =
                                 list_entry((current_free_list->free_list.next),
                                            struct page,
@@ -142,6 +146,7 @@ struct page *buddy_get_pages(struct phys_mem_pool *pool, u64 order)
                         list_del(&(ret->node));
                         ret->allocated = 1;
                         pool->free_lists[order].nr_free--;
+                        return ret;
                 }
         }
         return ret;
@@ -296,9 +301,13 @@ void lab2_test_buddy(void)
                         page = buddy_get_pages(pool, i);
                         BUG_ON(page == NULL);
                         lab_assert(page->order == i && page->allocated);
+                        // printk("order= %d, i=%d, all=%d\n", page->order, i , page->allocated);
+                        // BUG_ON(!page->order == i || !page->allocated);
                         expect_free_mem -= (1 << i) * PAGE_SIZE;
                         lab_assert(get_free_mem_size_from_buddy(pool)
                                    == expect_free_mem);
+                        // BUG_ON(get_free_mem_size_from_buddy(pool)
+                        //            != expect_free_mem);
                         buddy_free_pages(pool, page);
                         expect_free_mem += (1 << i) * PAGE_SIZE;
                         lab_assert(get_free_mem_size_from_buddy(pool)
