@@ -84,14 +84,21 @@ static struct page *split_page(struct phys_mem_pool *pool, u64 order,
          * Hint: Recursively put the buddy of current chunk into
          * a suitable free list.
          */
-        while (page->order != order) {
+        list_del(&(page->node));
+        pool->free_lists[page->order].nr_free--;
+
+        while (page->order > order) {
                 page->order--;
                 struct page *buddy = get_buddy_chunk(pool, page);
+
                 buddy->allocated = 0;
                 buddy->order = page->order;
-                list_add(&(buddy->node), &(pool->free_lists[buddy->order].free_list));
+                list_add(&(buddy->node),
+                         &(pool->free_lists[buddy->order].free_list));
                 pool->free_lists[buddy->order].nr_free++;
         }
+        list_add(&(page->node), &(pool->free_lists[order].free_list));
+        pool->free_lists[order].nr_free++;
         return page;
         /* LAB 2 TODO 2 END */
 }
@@ -103,17 +110,19 @@ struct page *buddy_get_pages(struct phys_mem_pool *pool, u64 order)
          * Hint: Find a chunk that satisfies the order requirement
          * in the free lists, then split it if necessary.
          */
-        struct page *ret;
+        struct page *ret = NULL;
         struct free_list *current_free_list;
 
         // Try to directly find a chunk
+        if (order >= BUDDY_MAX_ORDER)
+                return NULL;
+
         current_free_list = &(pool->free_lists[order]);
         if (current_free_list->nr_free) {
                 current_free_list->nr_free--;
-                ret = list_entry((current_free_list->free_list.next),
-                                 struct page,
-                                 node);
-                list_del(ret);
+                ret = list_entry(
+                        (current_free_list->free_list.next), struct page, node);
+                list_del(&(ret->node));
                 ret->allocated = 1;
                 return ret;
         }
@@ -122,10 +131,17 @@ struct page *buddy_get_pages(struct phys_mem_pool *pool, u64 order)
         for (int enum_order = order + 1; enum_order < BUDDY_MAX_ORDER;
              enum_order++) {
                 current_free_list++;
+
                 if (current_free_list->nr_free) {
                         struct page *to_split =
-                                current_free_list->free_list.next;
+                                list_entry((current_free_list->free_list.next),
+                                           struct page,
+                                           node);
                         ret = split_page(pool, order, to_split);
+
+                        list_del(&(ret->node));
+                        ret->allocated = 1;
+                        pool->free_lists[order].nr_free--;
                 }
         }
         return ret;
@@ -140,10 +156,18 @@ static struct page *merge_page(struct phys_mem_pool *pool, struct page *page)
          * if possible.
          */
         // Fetch buddy
+        if (page->order >= BUDDY_MAX_ORDER - 1)
+                return page;
         struct page *buddy_chunk = get_buddy_chunk(pool, page);
-        if (buddy_chunk->allocated || buddy_chunk->order != page->order)
+        if (!buddy_chunk || buddy_chunk->allocated
+            || buddy_chunk->order != page->order)
                 return page;
 
+        if (page > buddy_chunk) {
+                struct page* _ = page;
+                page = buddy_chunk;
+                buddy_chunk = _;
+        }
         buddy_chunk->allocated = 1;
         list_del(&(buddy_chunk->node));
         list_del(&(page->node));
@@ -151,7 +175,8 @@ static struct page *merge_page(struct phys_mem_pool *pool, struct page *page)
 
         // Merge once
         page->order++;
-        list_add(&(page->node), &(page->pool->free_lists[page->order].free_list));
+        list_add(&(page->node),
+                 &(pool->free_lists[page->order].free_list));
         pool->free_lists[page->order].nr_free++;
         return merge_page(pool, page);
         /* LAB 2 TODO 2 END */

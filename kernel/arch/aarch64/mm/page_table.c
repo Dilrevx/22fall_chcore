@@ -264,6 +264,7 @@ int map_range_in_pgtbl(void *pgtbl, vaddr_t va, paddr_t pa, size_t len,
                 set_pte_flags(pte, flags, USER_PTE);
                 pte->l3_page.pfn = pa >> 12;
         }
+        return 0;
         /* LAB 2 TODO 3 END */
 }
 
@@ -287,6 +288,7 @@ int unmap_range_in_pgtbl(void *pgtbl, vaddr_t va, size_t len)
 
                 pte->l3_page.is_valid = 0;
         }
+        return 0;
         /* LAB 2 TODO 3 END */
 }
 
@@ -332,6 +334,7 @@ int map_range_in_pgtbl_huge(void *pgtbl, vaddr_t va, paddr_t pa, size_t len,
                 pa += PAGE_SIZE;
                 len -= PAGE_SIZE;
         }
+        return 0;
         /* LAB 2 TODO 4 END */
 }
 
@@ -366,6 +369,7 @@ int unmap_range_in_pgtbl_huge(void *pgtbl, vaddr_t va, size_t len)
                 va += PAGE_SIZE;
                 len -= PAGE_SIZE;
         }
+        return 0;
         /* LAB 2 TODO 4 END */
 }
 
