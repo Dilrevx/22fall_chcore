@@ -340,7 +340,7 @@ struct cap_group *create_root_cap_group(char *name, size_t name_len)
 
         /* fixed PCID 1 for root process, PCID 0 is not used. */
         /* LAB 3 TODO BEGIN */
-        vmspace->pcid = VMSPACE_OBJ_ID;
+        vmspace->pcid = ROOT_PCID;
         vmspace_init(vmspace);
         slot_id = cap_alloc(cap_group, vmspace, 0);
         /* LAB 3 TODO END */
