@@ -416,7 +416,8 @@ void sys_thread_exit(void)
         printk("\nBack to kernel.\n");
 #endif
         /* LAB 3 TODO BEGIN */
-        
+        current_thread->thread_ctx->state = TS_EXIT;
+        current_thread = NULL;
         /* LAB 3 TODO END */
         printk("Lab 3 hang.\n");
         while (1) {
