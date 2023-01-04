@@ -77,7 +77,7 @@ int handle_trans_fault(struct vmspace *vmspace, vaddr_t fault_addr)
                         void* va = get_pages(0);
                         memset(va, 0, PAGE_SIZE);
 
-                        pa = virt_to_phys(pa);
+                        pa = virt_to_phys(va);
                         commit_page_to_pmo(pmo, index, pa);
                         map_range_in_pgtbl(vmspace->pgtbl, fault_addr, pa, PAGE_SIZE, perm);
                         /* LAB 3 TODO END */

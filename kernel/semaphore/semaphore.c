@@ -68,13 +68,13 @@ s32 signal_sem(struct semaphore *sem)
 {
         /* LAB 4 TODO BEGIN */
         struct thread *target = NULL;
-        if (sem->waiting_threads_count == 0) {
+        if (/*sem->sem_count >0 ||*/sem->waiting_threads_count == 0) {
                 sem->sem_count++;
         } else {
                 target = list_entry(sem->waiting_threads.next,
                                     struct thread,
                                     sem_queue_node);
-                list_del(&target->sem_queue_node);
+                list_del(&(target->sem_queue_node));
                 sem->waiting_threads_count--;
         }
 
