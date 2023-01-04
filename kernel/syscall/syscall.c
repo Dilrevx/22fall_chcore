@@ -45,7 +45,7 @@ void sys_putc(char ch)
 u32 sys_getc(void)
 {
         /* LAB 3 TODO BEGIN */
-        return uart_recv();
+        return nb_uart_recv();
         /* LAB 3 TODO END */
 }
 
