@@ -38,7 +38,7 @@ void sys_null_placeholder(long arg)
 void sys_putc(char ch)
 {
         /* LAB 3 TODO BEGIN */
-        uart_send(ch);
+        uart_send((u32)ch);
         /* LAB 3 TODO END */
 }
 
