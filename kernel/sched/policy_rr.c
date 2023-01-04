@@ -61,7 +61,29 @@ struct thread idle_threads[PLAT_CPU_NUM];
 int rr_sched_enqueue(struct thread *thread)
 {
         /* LAB 4 TODO BEGIN */
+        if (!thread || !thread->thread_ctx
+            || thread->thread_ctx->state == TS_READY)
+                return -EINVAL;
+        if (thread->thread_ctx->type == TYPE_IDLE)
+                return 0;
+        if (unlikely(thread->thread_ctx->prio > MAX_PRIO))
+                return -EINVAL;
 
+        u32 cpuid = 0, local_cpuid = 0;
+        s32 affinity;
+
+        local_cpuid = smp_get_cpu_id();
+        affinity = thread->thread_ctx->affinity;
+        cpuid = (affinity == NO_AFF) ? local_cpuid : affinity;
+
+        if (unlikely(cpuid >= PLAT_CPU_NUM))
+                return -EINVAL;
+
+        thread->thread_ctx->cpuid = cpuid;
+        thread->thread_ctx->state = TS_READY;
+        list_append(&(thread->ready_queue_node),
+                    &(rr_ready_queue_meta[cpuid].queue_head));
+        rr_ready_queue_meta[cpuid].queue_len++;
         /* LAB 4 TODO END */
         return 0;
 }
@@ -75,7 +97,15 @@ int rr_sched_enqueue(struct thread *thread)
 int rr_sched_dequeue(struct thread *thread)
 {
         /* LAB 4 TODO BEGIN */
+        if (!thread || !thread->thread_ctx
+            || thread->thread_ctx->state != TS_READY
+            || thread->thread_ctx->type == TYPE_IDLE
+            || list_empty(&thread->ready_queue_node))
+                return -EINVAL;
 
+        list_del(&(thread->ready_queue_node));
+        rr_ready_queue_meta[thread->thread_ctx->cpuid].queue_len--;
+        thread->thread_ctx->state = TS_INTER;
         /* LAB 4 TODO END */
         return 0;
 }
@@ -91,6 +121,17 @@ struct thread *rr_sched_choose_thread(void)
 {
         struct thread *thread = NULL;
         /* LAB 4 TODO BEGIN */
+        u32 cpuid = smp_get_cpu_id();
+
+        if (list_empty(&(rr_ready_queue_meta[cpuid].queue_head)))
+                thread = &idle_threads[cpuid];
+        else {
+                thread = list_entry(rr_ready_queue_meta[cpuid].queue_head.next,
+                                    struct thread,
+                                    ready_queue_node);
+
+                BUG_ON(rr_sched_dequeue(thread));
+        }
 
         /* LAB 4 TODO END */
         return thread;
@@ -103,7 +144,7 @@ struct thread *rr_sched_choose_thread(void)
 static inline void rr_sched_refill_budget(struct thread *target, u32 budget)
 {
         /* LAB 4 TODO BEGIN */
-
+        target->thread_ctx->sc->budget = budget;
         /* LAB 4 TODO END */
 }
 
@@ -125,7 +166,53 @@ static inline void rr_sched_refill_budget(struct thread *target, u32 budget)
 int rr_sched(void)
 {
         /* LAB 4 TODO BEGIN */
+        struct thread *old, *new;
+        old = current_thread;
+        new = NULL;
 
+        // Obtain and run
+        if (!old) {
+                new = rr_sched_choose_thread();
+                BUG_ON(!new);
+                switch_to_thread(new);
+                return 0;
+        }
+
+        BUG_ON(!old->thread_ctx);
+
+        if (old->thread_ctx->type != TYPE_SHADOW)
+                BUG_ON(!old->thread_ctx->sc);
+
+        if (old->thread_ctx->thread_exit_state == TE_EXITING) {
+                old->thread_ctx->state = TS_EXIT;
+                old->thread_ctx->thread_exit_state = TE_EXITED;
+        }
+
+        /* check old state */
+
+        switch (old->thread_ctx->state) {
+        case TS_EXIT:
+        case TS_WAITING:
+                /* code */
+                break;
+        case TS_RUNNING:
+                if (old->thread_ctx->sc->budget) {
+                        switch_to_thread(old);
+                        return 0;
+                }
+                rr_sched_refill_budget(old, DEFAULT_BUDGET);
+                old->thread_ctx->state = TS_INTER;
+                BUG_ON(rr_sched_enqueue(old) != 0);
+                break;
+        default:
+                kinfo("thread state: %d\n", old->thread_ctx->state);
+                BUG_ON(1);
+                break;
+        }
+
+        new = rr_sched_choose_thread();
+        BUG_ON(!new);
+        switch_to_thread(new);
         /* LAB 4 TODO END */
 
         return 0;
