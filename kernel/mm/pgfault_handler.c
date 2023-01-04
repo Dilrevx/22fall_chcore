@@ -73,8 +73,9 @@ int handle_trans_fault(struct vmspace *vmspace, vaddr_t fault_addr)
                         /* Not committed before. Then, allocate the physical
                          * page. */
                         /* LAB 3 TODO BEGIN */
-                        pa = get_pages(0); // actually va, just use the 'pa' var
-                        memset(pa, 0, PAGE_SIZE);
+                        // pa = get_pages(0); // actually va, just use the 'pa' var
+                        void* va = get_pages(0);
+                        memset(va, 0, PAGE_SIZE);
 
                         pa = virt_to_phys(pa);
                         commit_page_to_pmo(pmo, index, pa);
