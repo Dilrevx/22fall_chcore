@@ -114,8 +114,8 @@ static u64 load_binary(struct cap_group *cap_group, struct vmspace *vmspace,
 
                         pmo_cap[i] = create_pmo(
                                 seg_map_sz, PMO_DATA, cap_group, &pmo);
-                        memset(phys_to_virt(pmo->start), 0, pmo->size);
-                        memcpy(phys_to_virt(pmo->start)
+                        memset((void*)phys_to_virt(pmo->start), 0, pmo->size);
+                        memcpy((void*)phys_to_virt(pmo->start)
                                        + (OFFSET_MASK & p_vaddr),
                                bin + elf->p_headers[i].p_offset,
                                elf->p_headers[i].p_filesz);
